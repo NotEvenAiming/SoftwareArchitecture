@@ -7,7 +7,7 @@ providedIn: 'root'
 export class FileUploadService { 
 	
 // API url 
-baseApiUrl = "https://file.io"
+baseApiUrl = "https://0xyfrpolm1.execute-api.us-east-1.amazonaws.com/dev"
 	
 constructor(private http:HttpClient) { } 
 
