@@ -9,32 +9,47 @@
 <body>
   <div id="app">
     <h1>2EA2 FILE SERVICE</h1>
-    <div v-if="!image">
-      <h2>Select a File</h2>
-      <input id="upload" type="file" @change="onFileChange">
+    <button @click="setModeUpload()">Upload</button>
+    <button @click="setModeDownload()">Download</button>
+    <br><br>
+    <hr>
+    <div v-if="mode === 'download'">
+      <h2>Download</h2>
+      <div v-if="loading" class="loader"></div>
+      <div v-show="!loading">
+        <button @click="downloadFile()">Download</button>
+        <label for="uuidinput">Enter uuid: </label>
+        <input type="text" id="uuidinput" name="uuidinput">
+        <label for="downloadPassword"> password (optional): </label>
+        <input type="password" id="downloadPassword" name="downloadPassword">
+        <a v-show="fileDownloaded" href="" id="link">Download link</a>
+        <p v-show="fileDownloaded" id="checksumfield">checksum: </p>
+      </div>
     </div>
-    <div v-else>
-      <button v-if="!uploadURL" @click="removeImage">Remove File</button>
-      <button v-if="!uploadURL" @click="uploadImage">Upload File</button><br><br>
-      <input type="checkbox" id="usepw"/>
-      <label for="password">Password: </label>
-      <input type="text" id="password" disabled /><br><br>
-      <label for="maxdownloads">Maxiumum number of downloads: </label>
-      <input type="text" id="maxdownloads" name="maxdownloads">
+    <div v-else-if="mode === 'upload'">
+      <h2>Upload</h2>
+      <div v-if="loading" class="loader"></div>
+      <div v-else>
+        <div v-if="!image">
+          <h3>Select a File</h3>
+          <input id="upload" type="file" @change="onFileChange">
+        </div>
+        <div v-else>
+          <button v-if="!uploadURL" @click="removeFile">Remove File</button>
+          <button v-if="!uploadURL" @click="uploadFile">Upload File</button><br><br>
+          <input type="checkbox" id="checkboxPassword" onclick="var input = document.getElementById('password'); if(this.checked){ input.disabled = false; input.focus();}else{input.disabled=true;}"/>
+          <label for="password">Password: </label>
+          <input type="text" id="password" disabled/><br><br>
+          <input type="checkbox" id="checkboxMaxDownloads" onclick="var input = document.getElementById('maxdownloads'); if(this.checked){ input.disabled = false; input.focus();}else{input.disabled=true;}"/>
+          <label for="maxdownloads">Maximum number of downloads: </label>
+          <input type="text" id="maxdownloads" disabled>
+        </div>
+        <h2 v-if="uploadURL">Success! File uploaded.</h2>
+      </div>
     </div>
-    <div>
-      <button @click="downloadFile()">Download</button>
-      <label for="uuidinput">Enter uuid: </label>
-      <input type="text" id="uuidinput" name="uuidinput">
-      <a href="" id="link"></a>
-    </div>
-    <h2 v-if="uploadURL">Success! File uploaded.</h2>
   </div>
 
   <script>
-    document.getElementById('usepw').onchange = function() {
-    document.getElementById('password').enabled = this.checked;
-};
     const MAX_IMAGE_SIZE = 1000000;
     const API_ENDPOINT = 'https://0xyfrpolm1.execute-api.us-east-1.amazonaws.com/dev'
     new Vue({
@@ -42,28 +57,54 @@
       data: {
         image: '',
         uploadURL: '',
-        filename: ''
+        filename: '',
+        mode: '',
+        fileDownloaded: false,
+        loading: false
       },
       methods: {
         downloadFile: async function (e) {
-          console.log("download clicked");
-          var uuidinputval = document.getElementById('uuidinput').value;
-          console.log(uuidinputval);
+
+          this.loading = true;
+
+          var uuidInput = document.getElementById('uuidinput').value;
+          var passwordInput = document.getElementById('downloadPassword').value;
+
+          console.log("trying to download file " + uuidInput);
+
           const response = await axios({
             method: 'GET',
             url: API_ENDPOINT,
             headers: {
-              UUID: uuidinputval,
+              UUID: uuidInput,
+              password: passwordInput,
               "Content-Type": "application/json"
             }
           })
+
+          // Check whether the API returned an error
+          if (response.errorMessage != null) {
+            this.resetUI();
+            return alert(response.errorMessage);
+          }
+
           console.log('Response: ', response);
           console.log(response.body.url);
-          var downloadurl = response.body.url;
-          var link = document.getElementById("link");
-          link.innerHTML = "Download Link";
 
-          link.setAttribute('href', downloadurl);
+          var downloadUrl = response.body.url;
+          var downloadChecksum = response.body.checksum;
+          var downloadRemainingDownloads = response.body["Remaining downloads"];
+
+          document.getElementById("link").setAttribute('href', downloadUrl);
+          document.getElementById('checksumfield').innerText = "Checksum: " + downloadChecksum;
+          if (downloadRemainingDownloads >= 0)
+            document.getElementById('checksumfield').innerText += "\n Remaining downloads: " + downloadRemainingDownloads;
+          this.fileDownloaded = true;
+
+          window.location.href = downloadUrl;
+
+          this.loading = false;
+
         },
         onFileChange(e) {
           let files = e.target.files || e.dataTransfer.files
@@ -93,26 +134,29 @@
           }
           reader.readAsDataURL(file)
         },
-        removeImage: function (e) {
+        removeFile: function (e) {
           console.log('Remove clicked')
           this.image = ''
         },
-        uploadImage: async function (e) {
-
-          var passwordval = document.getElementById('password').value;
-          var maxdownloadval = document.getElementById('maxdownloads').value;
+        uploadFile: async function (e) {
           console.log('Upload clicked')
+
+          this.loading = true;
+
+          var passwordInput = document.getElementById('password').value;
+          var maxdownloadsInput = document.getElementById('maxdownloads').value;
+
           // Get the presigned URL
           const response = await axios({
             method: 'post',
             url: API_ENDPOINT,
             data: {
               object_key: filename,
-              password: passwordval,
-              rd: maxdownloadval
+              password: passwordInput,
+              rd: maxdownloadsInput
             }
           })
-          console.log('Response: ', response)
+          console.log('API Response: ', response)
           console.log('Uploading: ', this.image)
           let binary = atob(this.image.split(',')[1])
           let array = []
@@ -126,11 +170,30 @@
             body: blobData
           })
           console.log('Result: ', result)
+
+          this.loading = false;
+
           alert(response.UUID);
           // Final URL for the user doesn't need the query string params
           this.url = response.url.split('?')[0]
-        }
+        },
+        setModeDownload: function (e) {
+          console.log("Switching to download mode");
+          this.mode = 'download';
 
+          this.resetUI();
+        },
+        setModeUpload: function (e) {
+          console.log("Switching to upload mode");
+          this.mode = 'upload';
+
+          this.resetUI();
+        },
+
+        resetUI: function () {
+          this.fileDownloaded = false;
+          this.loading = false;
+        }
       }
 
     })
@@ -174,6 +237,21 @@
       margin: auto;
       display: block;
       margin-bottom: 10px;
+    }
+
+    .loader {
+      border: 16px solid #f3f3f3; /* Light grey */
+      border-top: 16px solid #3498db; /* Blue */
+      border-radius: 50%;
+      width: 120px;
+      height: 120px;
+      animation: spin 2s linear infinite;
+      margin:0 auto
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </body>
