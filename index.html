@@ -39,7 +39,7 @@
           <button v-if="!uploadURL" @click="uploadFile">Upload File</button><br><br>
           <input type="checkbox" id="checkboxPassword" onclick="var input = document.getElementById('password'); if(this.checked){ input.disabled = false; input.focus();}else{input.disabled=true;}"/>
           <label for="password">Password: </label>
-          <input type="text" id="password" disabled/><br><br>
+          <input type="password" id="password" disabled/><br><br>
           <input type="checkbox" id="checkboxMaxDownloads" onclick="var input = document.getElementById('maxdownloads'); if(this.checked){ input.disabled = false; input.focus();}else{input.disabled=true;}"/>
           <label for="maxdownloads">Maximum number of downloads: </label>
           <input type="text" id="maxdownloads" disabled>
